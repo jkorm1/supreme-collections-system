@@ -150,7 +150,7 @@ export function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
               {/* Info */}
               <p className="text-xs text-center text-white/60 mt-4">
-                Default: admin / jkorm123
+                Default: admin / Adu123
               </p>
             </div>
           </motion.div>

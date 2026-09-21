@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Plus, Save, Users, Phone, MapPin } from "lucide-react";
+import { Plus, Save, Users, Phone, MapPin, RefreshCw } from "lucide-react";
 
 export default function CustomersPage() {
   const [formData, setFormData] = useState({
@@ -12,6 +12,28 @@ export default function CustomersPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
+
+  const fetchCustomers = async () => {
+    setIsLoadingCustomers(true);
+    try {
+      const response = await fetch("/api/customers");
+      const data = await response.json();
+      if (data.success) {
+        setCustomers(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch customers:", error);
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -46,6 +68,7 @@ export default function CustomersPage() {
           Phone: "",
           Location: "",
         });
+        fetchCustomers();
       } else {
         setMessage({
           type: "error",
@@ -174,57 +197,61 @@ export default function CustomersPage() {
           </form>
         </div>
 
-        {/* Customer Information */}
-        <div className="space-y-6">
-          <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
+        {/* Customers Table */}
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-semibold text-primary">
-                Customer Information
+                Customer Records
               </h2>
             </div>
-
-            <div className="space-y-4">
-              <div className="p-3 bg-background rounded-lg">
-                <p className="text-sm text-foreground/70 mb-1">
-                  Customer ID Format
-                </p>
-                <p className="font-medium">CUST-XXXXXXX</p>
-              </div>
-
-              <div className="p-3 bg-background rounded-lg">
-                <p className="text-sm text-foreground/70 mb-1">
-                  Required Fields
-                </p>
-                <ul className="space-y-1 text-sm">
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-primary rounded-full"></span>
-                    Full Name
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-primary rounded-full"></span>
-                    Phone
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-primary rounded-full"></span>
-                    Location
-                  </li>
-                </ul>
-              </div>
-
-              <div className="p-3 bg-background rounded-lg">
-                <p className="text-sm text-foreground/70 mb-1">
-                  Customer Sheet Structure
-                </p>
-                <div className="text-xs space-y-1">
-                  <div>Customer_ID</div>
-                  <div>Full_Name</div>
-                  <div>Phone</div>
-                  <div>Location</div>
-                </div>
-              </div>
-            </div>
+            <button
+              onClick={fetchCustomers}
+              className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
+              aria-label="Refresh customers"
+            >
+              <RefreshCw className="w-4 h-4 text-primary" />
+            </button>
           </div>
+
+          {isLoadingCustomers ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : customers.length === 0 ? (
+            <p className="text-center text-foreground/60 py-8">
+              No customers recorded yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border text-foreground/70">
+                  <tr>
+                    <th className="pb-3 pr-4 font-medium">ID</th>
+                    <th className="pb-3 pr-4 font-medium">Full Name</th>
+                    <th className="pb-3 pr-4 font-medium">Phone</th>
+                    <th className="pb-3 font-medium">Location</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map((customer) => (
+                    <tr
+                      key={customer.Customer_ID}
+                      className="border-b border-border/50 last:border-0"
+                    >
+                      <td className="py-3 pr-4 font-mono text-xs">
+                        {customer.Customer_ID}
+                      </td>
+                      <td className="py-3 pr-4">{customer.Full_Name}</td>
+                      <td className="py-3 pr-4">{customer.Phone}</td>
+                      <td className="py-3">{customer.Location}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

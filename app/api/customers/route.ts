@@ -1,10 +1,20 @@
 import { readSheet, addRowToSheet } from '@/lib/google-sheets/client'
 import { createSuccessResponse, createErrorResponse } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 function generateCustomerID(): string {
   const timestamp = Date.now().toString(36).toUpperCase()
   const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase()
   return `CUST-${timestamp}-${randomPart}`
+}
+
+function text(value: unknown): string {
+  return value === undefined || value === null ? '' : String(value).trim()
+}
+
+function phoneKey(phone: unknown): string {
+  return text(phone).replace(/\D/g, '').slice(-9)
 }
 
 export async function GET() {
@@ -19,43 +29,40 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    const body = (await request.json()) as Record<string, unknown>
 
-    // Validate required fields
-    const requiredFields = ['Full_Name', 'Phone', 'Location']
-    for (const field of requiredFields) {
-      if (!body[field]) {
-        return createErrorResponse(`Missing required field: ${field}`, 400)
-      }
+    const fullName = text(body.Full_Name)
+    const phone = text(body.Phone)
+    const location = text(body.Location)
+
+    if (!fullName) {
+      return createErrorResponse('Missing required field: Full_Name', 400)
+    }
+    if (!phone || phoneKey(phone).length < 9) {
+      return createErrorResponse('Enter a valid phone number', 400)
+    }
+    if (!location) {
+      return createErrorResponse('Missing required field: Location', 400)
     }
 
-    // Check if customer with this phone already exists
-    const existingCustomers = await readSheet('Customers')
-    const existingCustomer = existingCustomers.find((c: any) => c.Phone === body.Phone)
-    
-    if (existingCustomer) {
-      return createErrorResponse('Customer with this phone number already exists', 400)
+    const customers = (await readSheet('Customers')) as any[]
+    const key = phoneKey(phone)
+    const alreadyCustomer = customers.some((c) => phoneKey(c.Phone) === key)
+
+    if (alreadyCustomer) {
+      return createErrorResponse('A customer with this phone number already exists', 409)
     }
 
-    // Create customer record
-    const customer = {
+    await addRowToSheet('Customers', {
       Customer_ID: generateCustomerID(),
-      Full_Name: body.Full_Name,
-      Phone: body.Phone,
-      Location: body.Location,
-      Date_Joined: new Date(),
-      Status: 'Active'
-    }
+      Full_Name: fullName,
+      Phone: phone,
+      Location: location,
+    })
 
-    // Save to Google Sheets
-    await addRowToSheet('Customers', customer)
-    
-    return createSuccessResponse({
-      id: customer.Customer_ID,
-      message: 'Customer recorded successfully'
-    }, 201)
+    return createSuccessResponse({ message: 'Customer recorded successfully' }, 201)
   } catch (error) {
-    console.error('Error recording customer:', error)
-    return createErrorResponse('Failed to record customer', 500)
+    console.error('Error creating customer:', error)
+    return createErrorResponse('Failed to create customer', 500)
   }
 }

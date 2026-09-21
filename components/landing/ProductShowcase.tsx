@@ -1,33 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Product } from "@/types";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ShoppingCart, Plus } from "lucide-react";
+import { ShoppingCart, Check } from "lucide-react";
+import { useCart } from "./CartContext";
+
+const FALLBACK_SIZES = "6,7,8,9,10,11,12,13";
+
+function parseSizes(sizes?: string): string[] {
+  return (sizes || FALLBACK_SIZES)
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Sheet cells come back as strings and may be empty, so only treat an
+// explicit 0 (or less) as sold out.
+function isSoldOut(product: Product): boolean {
+  const raw = product.Stock_Quantity as unknown;
+  if (raw === undefined || raw === null || String(raw).trim() === "") {
+    return false;
+  }
+  return Number(raw) <= 0;
+}
 
 export function ProductShowcase() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
-  const [orderDetails, setOrderDetails] = useState({
-    Customer_Name: "",
-    Phone: "",
-    Delivery_Address: "",
-    Size: "",
-    Quantity: 1,
-    Special_Instructions: "",
-  });
+
+  // Size picked on each card, keyed by Product_ID
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>(
+    {},
+  );
+  // Card that was tapped without a size chosen
+  const [missingSizeFor, setMissingSizeFor] = useState<string | null>(null);
+  // Card that just had an item added (drives the "Added" button state)
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { addItem } = useCart();
 
   useEffect(() => {
     async function loadProducts() {
@@ -45,76 +58,30 @@ export function ProductShowcase() {
     }
 
     loadProducts();
+
+    return () => {
+      if (addedTimer.current) clearTimeout(addedTimer.current);
+    };
   }, []);
 
-  const handleOrderNow = (product: Product) => {
-    setSelectedProduct(product);
-    setIsOrderDialogOpen(true);
+  const handleSelectSize = (productId: string, size: string) => {
+    setSelectedSizes((prev) => ({ ...prev, [productId]: size }));
+    if (missingSizeFor === productId) setMissingSizeFor(null);
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    const { name, value } = e.target;
-    setOrderDetails((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  const handleAddToCart = (product: Product) => {
+    const size = selectedSizes[product.Product_ID];
 
-  const handleSubmitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedProduct) return;
-
-    try {
-      // Create the order
-      const orderResponse = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          Order_ID: `ORD-${Date.now()}`,
-          Date: new Date().toISOString(),
-          Customer_Name: orderDetails.Customer_Name,
-          Phone: orderDetails.Phone,
-          Location: orderDetails.Location,
-          Delivery_Address: orderDetails.Delivery_Address,
-          Product_ID: selectedProduct.Product_ID,
-          Product_Name: selectedProduct.Product_Name,
-          Size: orderDetails.Size,
-          Color: orderDetails.Color,
-          Quantity: orderDetails.Quantity,
-          Unit_Price: selectedProduct.Price,
-          Total_Price: selectedProduct.Price * orderDetails.Quantity,
-          Special_Instructions: orderDetails.Special_Instructions,
-        }),
-      });
-
-      if (orderResponse.ok) {
-        // Reset form and close dialog
-        setOrderDetails({
-          Customer_Name: "",
-          Phone: "",
-          Location: "",
-          Delivery_Address: "",
-          Size: "",
-          Color: "",
-          Quantity: 1,
-          Special_Instructions: "",
-        });
-        setIsOrderDialogOpen(false);
-        setSelectedProduct(null);
-
-        // Show success message
-        alert("Order placed successfully!");
-      } else {
-        const errorData = await orderResponse.json();
-        alert(`Error: ${errorData.error}`);
-      }
-    } catch (error) {
-      console.error("Error placing order:", error);
-      alert("An error occurred while placing your order. Please try again.");
+    if (!size) {
+      setMissingSizeFor(product.Product_ID);
+      return;
     }
+
+    addItem(product, 1, size);
+
+    setJustAddedId(product.Product_ID);
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    addedTimer.current = setTimeout(() => setJustAddedId(null), 1500);
   };
 
   return (
@@ -155,211 +122,104 @@ export function ProductShowcase() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {products.map((product, index) => (
-            <motion.div
-              key={product.Product_ID}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              viewport={{ once: true }}
-              className="group"
-            >
-              <div className="bg-card rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-border/50">
-                {/* Image Placeholder */}
-                <div className="w-full h-64 bg-gradient-to-br from-accent/20 to-primary/20 flex items-center justify-center relative overflow-hidden">
-                  <div className="text-center">
-                    <div className="w-20 h-20 bg-primary/10 rounded mx-auto mb-3" />
-                    <p className="text-xs text-foreground/40">Product Image</p>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {products.map((product) => {
+            const id = product.Product_ID;
+            const sizes = parseSizes(product.Sizes);
+            const selected = selectedSizes[id];
+            const missing = missingSizeFor === id;
+            const added = justAddedId === id;
+            const soldOut = isSoldOut(product);
 
-                {/* Content */}
-                <div className="p-6">
-                  <div className="mb-3">
-                    <span className="inline-block px-3 py-1 bg-accent/15 text-primary text-xs font-semibold rounded-full">
-                      {product.Category}
-                    </span>
+            return (
+              <article
+                key={id}
+                className="bg-card rounded-lg border border-border/50 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col gap-5"
+              >
+                {product.Image_URL ? (
+                  <img
+                    src={product.Image_URL}
+                    alt={product.Product_Name}
+                    className="w-full h-48 object-cover rounded-md"
+                  />
+                ) : (
+                  <div className="w-full h-48 bg-gradient-to-br from-accent/20 to-primary/20 rounded-md flex items-center justify-center">
+                    <p className="text-xs text-foreground/40">No Image</p>
                   </div>
+                )}
 
-                  <h3 className="text-base font-bold text-foreground mb-2 line-clamp-2">
+                <div>
+                  <h3 className="text-base font-bold text-foreground line-clamp-2">
                     {product.Product_Name}
                   </h3>
 
-                  <p className="text-xs text-foreground/60 mb-4 line-clamp-2">
-                    {product.Description}
+                  <p className="text-xl font-bold text-primary mt-1">
+                    GHS {product.Price.toFixed(2)}
                   </p>
-
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-2xl font-bold text-primary">
-                        GHS {product.Price.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-foreground/50 mt-1">
-                        {product.Stock_Quantity > 0 ? (
-                          <span className="text-accent font-semibold">
-                            {product.Stock_Quantity} in stock
-                          </span>
-                        ) : (
-                          <span className="text-red-600">Out of stock</span>
-                        )}
-                      </p>
-                    </div>
-                    {product.Sizes && (
-                      <div className="flex flex-wrap gap-2">
-                        {product.Sizes.split(",")
-                          .slice(0, 4)
-                          .map((size) => (
-                            <span
-                              key={size}
-                              className="text-xs px-2.5 py-1 bg-primary/10 rounded text-primary font-medium"
-                            >
-                              {size.trim()}
-                            </span>
-                          ))}
-                      </div>
-                    )}
-                    <Button
-                      onClick={() => handleOrderNow(product)}
-                      disabled={product.Stock_Quantity === 0}
-                      className="w-full bg-primary hover:bg-primary/90"
-                    >
-                      <ShoppingCart className="w-4 h-4 mr-2" />
-                      Order Now
-                    </Button>
-                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+
+                <div>
+                  <p className="text-xs font-medium text-foreground/60 mb-2">
+                    Size
+                  </p>
+                  <div
+                    role="group"
+                    aria-label={`Size for ${product.Product_Name}`}
+                    className="flex flex-wrap gap-2"
+                  >
+                    {sizes.map((size) => {
+                      const isSelected = selected === size;
+                      return (
+                        <button
+                          key={size}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => handleSelectSize(id, size)}
+                          className={`min-w-10 px-3 py-1.5 rounded border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : `bg-transparent text-primary hover:border-primary ${
+                                  missing ? "border-red-400" : "border-border"
+                                }`
+                          }`}
+                        >
+                          {size}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {missing && (
+                    <p role="alert" className="text-xs text-red-600 mt-2">
+                      Pick a size to add this to your cart.
+                    </p>
+                  )}
+                </div>
+
+                <Button
+                  onClick={() => handleAddToCart(product)}
+                  disabled={soldOut}
+                  aria-live="polite"
+                  className="w-full mt-auto bg-primary hover:bg-primary/90"
+                >
+                  {soldOut ? (
+                    "Sold out"
+                  ) : added ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Added to cart
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      Add to cart
+                    </>
+                  )}
+                </Button>
+              </article>
+            );
+          })}
         </div>
       )}
-
-      {/* Order Dialog */}
-      <Dialog open={isOrderDialogOpen} onOpenChange={setIsOrderDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>Place Your Order</DialogTitle>
-          </DialogHeader>
-          {selectedProduct && (
-            <form onSubmit={handleSubmitOrder} className="space-y-6">
-              <div className="bg-primary/5 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">
-                  {selectedProduct.Product_Name}
-                </h3>
-                <p className="text-sm text-foreground/70">
-                  Price: GHS {selectedProduct.Price.toFixed(2)}
-                </p>
-                <p className="text-sm text-foreground/70">
-                  Sizes: {selectedProduct.Sizes}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="Customer_Name">Full Name *</Label>
-                  <Input
-                    id="Customer_Name"
-                    name="Customer_Name"
-                    value={orderDetails.Customer_Name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="Phone">Phone Number *</Label>
-                  <Input
-                    id="Phone"
-                    name="Phone"
-                    value={orderDetails.Phone}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="Location">Location *</Label>
-                  <Input
-                    id="Location"
-                    name="Location"
-                    value={orderDetails.Location}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="Delivery_Address">Delivery Address *</Label>
-                  <Input
-                    id="Delivery_Address"
-                    name="Delivery_Address"
-                    value={orderDetails.Delivery_Address}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="Size">Size *</Label>
-                  <Input
-                    id="Size"
-                    name="Size"
-                    value={orderDetails.Size}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="Color">Color</Label>
-                  <Input
-                    id="Color"
-                    name="Color"
-                    value={orderDetails.Color}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="Quantity">Quantity *</Label>
-                  <Input
-                    id="Quantity"
-                    name="Quantity"
-                    type="number"
-                    min="1"
-                    value={orderDetails.Quantity}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="Special_Instructions">
-                  Special Instructions
-                </Label>
-                <Textarea
-                  id="Special_Instructions"
-                  name="Special_Instructions"
-                  value={orderDetails.Special_Instructions}
-                  onChange={handleInputChange}
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-between items-center pt-4 border-t">
-                <div className="text-lg font-semibold">
-                  Total: GHS{" "}
-                  {(selectedProduct.Price * orderDetails.Quantity).toFixed(2)}
-                </div>
-                <Button
-                  type="submit"
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Place Order
-                </Button>
-              </div>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }

@@ -15,7 +15,7 @@ const REQUIRED_SHEETS = {
     'Date',
     'Customer_Name',
     'Phone',
-    'Delivery_Address',
+    'Location',
     'Product_ID',
     'Product_Name',
     'Size',
