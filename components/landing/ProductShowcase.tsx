@@ -64,13 +64,16 @@ export function ProductShowcase() {
     };
   }, []);
 
-  const handleSelectSize = (productId: string, size: string) => {
-    setSelectedSizes((prev) => ({ ...prev, [productId]: size }));
+  const handleSelectSize = (
+    productId: string,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    setSelectedSizes((prev) => ({ ...prev, [productId]: e.target.value }));
     if (missingSizeFor === productId) setMissingSizeFor(null);
   };
 
   const handleAddToCart = (product: Product) => {
-    const size = selectedSizes[product.Product_ID];
+    const size = selectedSizes[product.Product_ID]?.trim();
 
     if (!size) {
       setMissingSizeFor(product.Product_ID);
@@ -162,35 +165,20 @@ export function ProductShowcase() {
                   <p className="text-xs font-medium text-foreground/60 mb-2">
                     Size
                   </p>
-                  <div
-                    role="group"
-                    aria-label={`Size for ${product.Product_Name}`}
-                    className="flex flex-wrap gap-2"
-                  >
-                    {sizes.map((size) => {
-                      const isSelected = selected === size;
-                      return (
-                        <button
-                          key={size}
-                          type="button"
-                          aria-pressed={isSelected}
-                          onClick={() => handleSelectSize(id, size)}
-                          className={`min-w-10 px-3 py-1.5 rounded border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                            isSelected
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : `bg-transparent text-primary hover:border-primary ${
-                                  missing ? "border-red-400" : "border-border"
-                                }`
-                          }`}
-                        >
-                          {size}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Enter your size"
+                    value={selectedSizes[id] || ""}
+                    onChange={(e) => handleSelectSize(id, e)}
+                    className={`w-full px-3 py-2 rounded border text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent bg-transparent text-primary ${
+                      missing
+                        ? "border-red-400"
+                        : "border-border hover:border-primary"
+                    }`}
+                  />
                   {missing && (
                     <p role="alert" className="text-xs text-red-600 mt-2">
-                      Pick a size to add this to your cart.
+                      Enter a size to add this to your cart.
                     </p>
                   )}
                 </div>

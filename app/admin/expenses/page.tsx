@@ -1,18 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Plus, Save, Receipt } from "lucide-react";
+import { DollarSign, Plus, Save, Receipt, RefreshCw } from "lucide-react";
 
 export default function ExpensesPage() {
   const [formData, setFormData] = useState({
     Category: "",
     Description: "",
     Amount: 0,
-    Notes: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [isLoadingExpenses, setIsLoadingExpenses] = useState(true);
+
+  const fetchExpenses = async () => {
+    setIsLoadingExpenses(true);
+    try {
+      const response = await fetch("/api/expenses");
+      const data = await response.json();
+      if (data.success) {
+        setExpenses(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch expenses:", error);
+    } finally {
+      setIsLoadingExpenses(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchExpenses();
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -42,13 +63,12 @@ export default function ExpensesPage() {
 
       if (response.ok) {
         setMessage({ type: "success", text: "Expense recorded successfully!" });
-        // Reset form
         setFormData({
           Category: "",
           Description: "",
           Amount: 0,
-          Notes: "",
         });
+        fetchExpenses();
       } else {
         setMessage({
           type: "error",
@@ -111,7 +131,7 @@ export default function ExpensesPage() {
                 name="Category"
                 value={formData.Category}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground/80"
                 required
               >
                 <option value="">Select a category</option>
@@ -126,7 +146,7 @@ export default function ExpensesPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
+              <label className="block text-sm font-medium text-foreground/80 mb-1">
                 Description
               </label>
               <input
@@ -134,7 +154,7 @@ export default function ExpensesPage() {
                 name="Description"
                 value={formData.Description}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground/80"
                 required
               />
             </div>
@@ -148,23 +168,10 @@ export default function ExpensesPage() {
                 name="Amount"
                 value={formData.Amount}
                 onChange={handleChange}
-                min="0"
-                step="0.01"
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                min=""
+                step="1"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground/80"
                 required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Notes
-              </label>
-              <textarea
-                name="Notes"
-                value={formData.Notes}
-                onChange={handleChange}
-                rows={3}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
 
@@ -197,36 +204,73 @@ export default function ExpensesPage() {
           </form>
         </div>
 
-        {/* Expense Summary */}
-        <div className="space-y-6">
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="flex items-center gap-2 mb-4">
+        {/* Expenses Table */}
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-semibold text-primary">
-                Expense Summary
+                Expense Records
               </h2>
             </div>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">Category</span>
-                <span className="text-lg font-semibold text-primary">
-                  {formData.Category || "Not selected"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">Description</span>
-                <span className="text-lg font-semibold text-primary">
-                  {formData.Description || "Not provided"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">Amount</span>
-                <span className="text-lg font-semibold text-primary">
-                  GHS {formData.Amount.toFixed(2)}
-                </span>
-              </div>
-            </div>
+            <button
+              onClick={fetchExpenses}
+              className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
+              aria-label="Refresh expenses"
+            >
+              <RefreshCw className="w-4 h-4 text-primary" />
+            </button>
           </div>
+
+          {isLoadingExpenses ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : expenses.length === 0 ? (
+            <p className="text-center text-foreground/60 py-8">
+              No expenses recorded yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border text-foreground/70">
+                  <tr>
+                    <th className="pb-3 pr-4 font-medium">ID</th>
+                    <th className="pb-3 pr-4 font-medium">Category</th>
+                    <th className="pb-3 pr-4 font-medium">Description</th>
+                    <th className="pb-3 pr-4 font-medium">Amount</th>
+                    <th className="pb-3 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenses.map((expense) => (
+                    <tr
+                      key={expense.ID}
+                      className="border-b border-border/50 last:border-0 text-foreground/70"
+                    >
+                      <td className="py-3 text-xs text-foreground/60">
+                        {expense.Date
+                          ? new Date(expense.Date).toLocaleDateString()
+                          : ""}
+                      </td>
+                      <td className="py-3 pr-4 font-mono text-xs">
+                        {expense.ID}
+                      </td>
+                      <td className="py-3 pr-4 text-foreground/70">
+                        {expense.Category}
+                      </td>
+                      <td className="py-3 pr-4 text-foreground/70">
+                        {expense.Description}
+                      </td>
+                      <td className="py-3 pr-4 font-semibold text-primary">
+                        GHS {Number(expense.Amount).toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

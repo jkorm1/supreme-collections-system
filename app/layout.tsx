@@ -1,7 +1,7 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { GoogleSheetsInit } from "@/components/GoogleSheetsInit";
+
 import { CartProvider } from "@/components/landing/CartContext";
 
 export const metadata: Metadata = {
@@ -46,7 +46,6 @@ export default function RootLayout({
     <html lang="en" className="scroll-smooth">
       <body className="antialiased bg-background text-foreground">
         <CartProvider>
-          <GoogleSheetsInit />
           {children}
           {process.env.NODE_ENV === "production" && <Analytics />}
         </CartProvider>

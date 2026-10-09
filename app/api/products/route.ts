@@ -5,7 +5,7 @@ import { Product } from '@/types'
 // Never cache this route: the sheet can change at any time
 export const dynamic = 'force-dynamic'
 
-const DEFAULT_SIZES = '6,7,8,9,10,11,12,13'
+
 
 function generateProductID(): string {
   return `PROD-${Date.now().toString(36).toUpperCase()}`
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     let products = rows.map((row) => ({
       ...row,
       Price: Number(row.Price) || 0,
-      Sizes: row.Sizes || DEFAULT_SIZES,
+    
     }))
 
     if (category) {
@@ -50,14 +50,39 @@ export async function GET(request: Request) {
     return createErrorResponse(errorText('Failed to read products', error), 500)
   }
 }
-
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as Partial<Product>
-    const price = Number(body.Price)
+    const body = await request.json();
+    
+    // Handle Bulk Insert
+    if (body.bulk && Array.isArray(body.bulk)) {
+      const productsToInsert = body.bulk.map((item: any) => {
+        const price = Number(item.Price);
+        if (!item.Product_Name || !item.Category || Number.isNaN(price)) {
+          throw new Error('Missing required fields in one or more products');
+        }
+        return {
+          Product_ID: generateProductID(),
+          Product_Name: item.Product_Name,
+          Category: item.Category,
+          Price: price,
+          Description: item.Description || '',
+          Image_URL: item.Image_URL || '',
+        };
+      });
+
+      for (const product of productsToInsert) {
+        await addRowToSheet('Products', product as any);
+      }
+
+      return createSuccessResponse({ count: productsToInsert.length }, 201);
+    }
+
+    // Handle Single Insert
+    const price = Number(body.Price);
 
     if (!body.Product_Name || !body.Category || Number.isNaN(price)) {
-      return createErrorResponse('Missing required fields', 400)
+      return createErrorResponse('Missing required fields', 400);
     }
 
     const product: Product = {
@@ -66,18 +91,17 @@ export async function POST(request: Request) {
       Category: body.Category,
       Price: price,
       Description: body.Description || '',
-      Sizes: body.Sizes || DEFAULT_SIZES,
       Image_URL: body.Image_URL || '',
-    }
+    };
 
-    await addRowToSheet('Products', product as any)
+    await addRowToSheet('Products', product as any);
 
-    return createSuccessResponse(product, 201)
+    return createSuccessResponse(product, 201);
   } catch (error) {
-    console.error('Error creating product:', error)
+    console.error('Error creating product:', error);
     return createErrorResponse(
       errorText('Failed to create product', error),
       500
-    )
+    );
   }
 }

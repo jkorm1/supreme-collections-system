@@ -1,7 +1,7 @@
-import { readSheet, addRowToSheet } from '@/lib/google-sheets/client'
+import { readSheet, addRowToSheet,  updateRowInSheet, updateRowById } from '@/lib/google-sheets/client'
 import { createSuccessResponse, createErrorResponse } from '@/lib/auth'
+import { sendOrderNotification } from '@/lib/telegram'
 
-// Never cache this route: orders change all the time
 export const dynamic = 'force-dynamic'
 
 const MAX_LINES = 50
@@ -15,7 +15,7 @@ function generateOrderID(): string {
 }
 
 function generateCustomerID(): string {
-  const timestamp = Date.now().toString(36).toUpperCase()
+  const timestamp = (Date.now() + 1).toString(36).toUpperCase()
   const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase()
   return `CUST-${timestamp}-${randomPart}`
 }
@@ -24,8 +24,6 @@ function text(value: unknown): string {
   return value === undefined || value === null ? '' : String(value).trim()
 }
 
-// Compare phone numbers by their last 9 digits so "0244 123 456",
-// "+233244123456" and "244123456" (a sheet can drop the leading 0) all match.
 function phoneKey(phone: unknown): string {
   return text(phone).replace(/\D/g, '').slice(-9)
 }
@@ -44,28 +42,10 @@ export async function GET() {
   }
 }
 
-/**
- * Accepts a whole cart:
- * {
- *   Customer_Name, Phone, Location, Special_Instructions?,
- *   Items: [{ Product_ID, Size, Quantity }, ...]
- * }
- *
- * The older single-product shape (Product_ID, Size, Quantity at the top level,
- * with Location or Delivery_Address) is still accepted.
- *
- * Writes:
- *  - Customers: one row, only if this phone number is not already there
- *  - Orders:    ONE row for the whole cart. With more than one item,
- *               Product_ID, Product_Name, Size, Quantity and Unit_Price hold
- *               each item's value joined with "; " (same order in every
- *               column), and Total_Price is the total for the whole order.
- */
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>
 
-    // ---- Customer details ----
     const customerName = text(body.Customer_Name)
     const phone = text(body.Phone)
     const location = text(body.Location) || text(body.Delivery_Address)
@@ -81,7 +61,6 @@ export async function POST(request: Request) {
       return createErrorResponse('Missing required field: Location', 400)
     }
 
-    // ---- Order lines ----
     const rawLines: unknown[] = Array.isArray(body.Items) ? body.Items : [body]
 
     if (rawLines.length === 0) {
@@ -110,7 +89,6 @@ export async function POST(request: Request) {
       lines.push({ productId, size, quantity })
     }
 
-    // ---- Price every line from the Products sheet (never trust the browser) ----
     const products = (await readSheet('Products')) as any[]
     const productById = new Map<string, any>()
     for (const p of products) productById.set(String(p.Product_ID), p)
@@ -150,13 +128,9 @@ export async function POST(request: Request) {
       unitPrices.push(unitPrice)
     }
 
-    // One row for the whole order. A single-item order looks exactly as before
-    // (Quantity and Unit_Price stay numbers); with several items each column
-    // lists the items in the same order, e.g. Size "9; 8", Quantity "2; 1".
     const single = lines.length === 1
     const join = (values: (string | number)[]) => values.join(LIST_SEPARATOR)
 
-    // Keys are in the same order as the Orders sheet headers
     const orderRow: Record<string, string | number> = {
       Order_ID: orderId,
       Date: date,
@@ -170,16 +144,14 @@ export async function POST(request: Request) {
       Unit_Price: single ? unitPrices[0] : join(unitPrices),
       Total_Price: round2(orderTotal),
       Special_Instructions: instructions,
+      Status: 'Pending',
     }
 
-    // ---- 1. Customers sheet (first, so a failure here leaves no half-saved order
-    //         and a retry never creates a duplicate customer) ----
     const customers = (await readSheet('Customers')) as any[]
     const key = phoneKey(phone)
     const alreadyCustomer = customers.some((c) => phoneKey(c.Phone) === key)
 
     if (!alreadyCustomer) {
-      // Keys are in the same order as the Customers sheet headers
       await addRowToSheet('Customers', {
         Customer_ID: generateCustomerID(),
         Full_Name: customerName,
@@ -188,10 +160,23 @@ export async function POST(request: Request) {
       })
     }
 
-    // ---- 2. Orders sheet: one row for the whole order ----
-    await addRowToSheet('Orders', orderRow)
+   await addRowToSheet('Orders', orderRow)
+
+    // Send Telegram notification for the new order
+    await sendOrderNotification({
+      orderId,
+      customerName,
+      phone,
+      location,
+      productNames: join(productNames),
+      sizes: join(sizes),
+      quantities: single ? quantities[0] : join(quantities),
+      totalPrice: round2(orderTotal),
+      instructions,
+    })
 
     return createSuccessResponse(
+
       {
         orderID: orderId,
         total: round2(orderTotal),
@@ -203,5 +188,35 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating order:', error)
     return createErrorResponse('Failed to create order', 500)
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = (await request.json()) as Record<string, unknown>
+    const orderId = text(body.Order_ID)
+    const newStatus = text(body.Status)
+
+    if (!orderId) {
+      return createErrorResponse('Missing Order_ID', 400)
+    }
+
+    const validStatuses = ['Pending', 'Completed', 'Cancelled']
+    if (!validStatuses.includes(newStatus)) {
+      return createErrorResponse('Invalid status value', 400)
+    }
+
+    const updated = await updateRowById('Orders', 'Order_ID', orderId, {
+      Status: newStatus,
+    })
+
+    if (!updated) {
+      return createErrorResponse('Order not found', 404)
+    }
+
+    return createSuccessResponse({ Order_ID: orderId, Status: newStatus })
+  } catch (error) {
+    console.error('Error updating order status:', error)
+    return createErrorResponse('Failed to update order status', 500)
   }
 }

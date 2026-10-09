@@ -40,8 +40,12 @@ export function Navigation({ onLoginClick }: NavigationProps) {
             {/* Logo */}
             <div className="flex-shrink-0 flex items-center gap-2">
               <Link href="/" className="flex items-center gap-2">
-                <div className="w-10 h-10 border-2 border-accent flex items-center justify-center rounded bg-white/10">
-                  <span className="text-sm font-bold text-accent">SC</span>
+                <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden bg-white shadow-md">
+                  <img
+                    src="/logo.png"
+                    alt="SC Logo"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
                 <span className="text-lg font-bold text-accent hidden sm:inline">
                   SUPREME

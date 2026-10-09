@@ -81,8 +81,12 @@ export function AdminSidebar() {
         {/* Logo */}
         <div className="p-6 border-b border-sidebar-border">
           <Link href="/admin" className="flex items-center gap-3">
-            <div className="w-10 h-10 border-2 border-sidebar-accent flex items-center justify-center rounded">
-              <span className="text-xs font-bold text-sidebar-accent">SC</span>
+            <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full overflow-hidden bg-white shadow-md">
+              <img
+                src="/logo.png"
+                alt="SC Logo"
+                className="w-full h-full object-cover"
+              />
             </div>
             <div>
               <p className="text-sm font-bold text-sidebar-foreground">

@@ -22,7 +22,8 @@ const REQUIRED_SHEETS = {
     'Quantity',
     'Unit_Price',
     'Total_Price',
-    'Special_Instructions'
+    'Special_Instructions',
+    'Status'
   ],
   'Sales': [
     'ID',

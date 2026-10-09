@@ -1,14 +1,50 @@
-'use client'
+"use client";
 
-import { motion } from 'framer-motion'
-import { Database, RotateCcw, Download, Upload } from 'lucide-react'
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Database, RotateCcw, Download, Upload } from "lucide-react";
 
 export default function SettingsPage() {
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initMessage, setInitMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const handleInitialize = async () => {
+    setIsInitializing(true);
+    setInitMessage(null);
+    try {
+      const response = await fetch("/api/init-sheets");
+      const data = await response.json();
+      if (data.success) {
+        setInitMessage({
+          type: "success",
+          text: "Database initialized successfully!",
+        });
+      } else {
+        setInitMessage({
+          type: "error",
+          text: data.error || "Failed to initialize database",
+        });
+      }
+    } catch (error) {
+      setInitMessage({
+        type: "error",
+        text: "An error occurred. Please try again.",
+      });
+    } finally {
+      setIsInitializing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <h1 className="text-3xl font-bold text-primary">System Settings</h1>
-        <p className="text-foreground/60 mt-1">Manage database, backups, and configuration</p>
+        <p className="text-foreground/60 mt-1">
+          Manage database, backups, and configuration
+        </p>
       </motion.div>
 
       {/* Database Management */}
@@ -19,7 +55,9 @@ export default function SettingsPage() {
       >
         <div className="flex items-center gap-3 mb-4">
           <Database className="w-6 h-6 text-accent" />
-          <h2 className="text-xl font-semibold text-primary">Database Management</h2>
+          <h2 className="text-xl font-semibold text-primary">
+            Database Management
+          </h2>
         </div>
 
         <div className="space-y-3">
@@ -27,10 +65,24 @@ export default function SettingsPage() {
             Manage your Excel database schema, create backups, and restore data
           </p>
 
+          {initMessage && (
+            <div
+              className={`p-3 rounded-lg text-sm ${initMessage.type === "success" ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"}`}
+            >
+              {initMessage.text}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <button className="px-4 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium flex items-center gap-2">
-              <RotateCcw className="w-4 h-4" />
-              Initialize Database
+            <button
+              onClick={handleInitialize}
+              disabled={isInitializing}
+              className="px-4 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium flex items-center gap-2 disabled:opacity-50"
+            >
+              <RotateCcw
+                className={`w-4 h-4 ${isInitializing ? "animate-spin" : ""}`}
+              />
+              {isInitializing ? "Initializing..." : "Initialize Database"}
             </button>
             <button className="px-4 py-2 bg-primary text-white rounded-lg hover:shadow-lg transition-all text-sm font-medium flex items-center gap-2">
               <Download className="w-4 h-4" />
@@ -55,7 +107,9 @@ export default function SettingsPage() {
         transition={{ delay: 0.1 }}
         className="bg-card border border-border rounded-lg p-6"
       >
-        <h2 className="text-xl font-semibold text-primary mb-4">Company Information</h2>
+        <h2 className="text-xl font-semibold text-primary mb-4">
+          Company Information
+        </h2>
 
         <div className="space-y-4">
           <div>
@@ -99,5 +153,5 @@ export default function SettingsPage() {
         </div>
       </motion.div>
     </div>
-  )
+  );
 }

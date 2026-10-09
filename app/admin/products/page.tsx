@@ -15,8 +15,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-// Add this after the imports and before the component definition
 const PRODUCT_CATEGORIES = ["Slippers", "Sneakers", "Shoes"];
+const defaultProduct = {
+  Product_Name: "",
+  Category: "",
+  Price: 0,
+  Description: "",
+  Image_URL: "",
+};
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -24,14 +30,9 @@ export default function ProductsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState({
-    Product_Name: "",
-    Category: "",
-    Price: 0,
-    Description: "",
-    Sizes: "6,7,8,9,10,11,12,13",
-    Image_URL: "",
-  });
+  const [formData, setFormData] = useState({ ...defaultProduct });
+  const [isBulkMode, setIsBulkMode] = useState(false);
+  const [bulkProducts, setBulkProducts] = useState([{ ...defaultProduct }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
@@ -55,27 +56,29 @@ export default function ProductsPage() {
 
   const handleAddProduct = () => {
     setIsEditing(false);
+    setIsBulkMode(false);
     setEditingProduct(null);
-    setFormData({
-      Product_Name: "",
-      Category: "",
-      Price: 0,
-      Description: "",
-      Sizes: "6,7,8,9,10,11,12,13",
-      Image_URL: "",
-    });
+    setFormData({ ...defaultProduct });
+    setIsDialogOpen(true);
+  };
+
+  const handleBulkAdd = () => {
+    setIsEditing(false);
+    setIsBulkMode(true);
+    setEditingProduct(null);
+    setBulkProducts([{ ...defaultProduct }]);
     setIsDialogOpen(true);
   };
 
   const handleEditProduct = (product: Product) => {
     setIsEditing(true);
+    setIsBulkMode(false);
     setEditingProduct(product);
     setFormData({
       Product_Name: product.Product_Name,
       Category: product.Category,
       Price: product.Price,
       Description: product.Description || "",
-      Sizes: product.Sizes || "6,7,8,9,10,11,12,13",
       Image_URL: product.Image_URL || "",
     });
     setIsDialogOpen(true);
@@ -117,47 +120,90 @@ export default function ProductsPage() {
     }));
   };
 
+  const handleBulkChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+    setBulkProducts((prev) => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [name]: name === "Price" ? parseFloat(value) || 0 : value,
+      };
+      return updated;
+    });
+  };
+
+  const addBulkRow = () => {
+    setBulkProducts((prev) => [...prev, { ...defaultProduct }]);
+  };
+
+  const removeBulkRow = (index: number) => {
+    setBulkProducts((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage({ type: "", text: "" });
 
     try {
-      const url =
-        isEditing && editingProduct
-          ? `/api/products/${editingProduct.Product_ID}`
-          : "/api/products";
-
-      const method = isEditing ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setMessage({
-          type: "success",
-          text: isEditing
-            ? "Product updated successfully!"
-            : "Product added successfully!",
+      if (isBulkMode) {
+        const response = await fetch("/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bulk: bulkProducts }),
         });
-        setIsDialogOpen(false);
 
-        // Refresh the product list
-        const productsResponse = await fetch("/api/products");
-        const productsData = await productsResponse.json();
-        if (productsData.success) {
-          setProducts(productsData.data);
+        const data = await response.json();
+
+        if (response.ok) {
+          setMessage({ type: "success", text: "Products added successfully!" });
+          setIsDialogOpen(false);
+        } else {
+          setMessage({
+            type: "error",
+            text: data.error || "Failed to add products",
+          });
         }
       } else {
-        setMessage({
-          type: "error",
-          text: data.error || "Failed to save product",
+        const url =
+          isEditing && editingProduct
+            ? `/api/products/${editingProduct.Product_ID}`
+            : "/api/products";
+
+        const method = isEditing ? "PUT" : "POST";
+
+        const response = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
         });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          setMessage({
+            type: "success",
+            text: isEditing
+              ? "Product updated successfully!"
+              : "Product added successfully!",
+          });
+          setIsDialogOpen(false);
+        } else {
+          setMessage({
+            type: "error",
+            text: data.error || "Failed to save product",
+          });
+        }
+      }
+
+      // Refresh the product list
+      const productsResponse = await fetch("/api/products");
+      const productsData = await productsResponse.json();
+      if (productsData.success) {
+        setProducts(productsData.data);
       }
     } catch (error) {
       setMessage({
@@ -182,10 +228,23 @@ export default function ProductsPage() {
             Manage your product inventory
           </p>
         </div>
-        <Button onClick={handleAddProduct} className="flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          Add Product
-        </Button>
+        <div className="flex gap-2 text-primary">
+          <Button
+            onClick={handleBulkAdd}
+            variant="outline"
+            className="flex items-center gap-2 text-pimary"
+          >
+            <Plus className="w-4 h-4 text-primary" />
+            Bulk Add
+          </Button>
+          <Button
+            onClick={handleAddProduct}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add Product
+          </Button>
+        </div>
       </motion.div>
 
       {message.text && (
@@ -233,9 +292,9 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                {products.map((product: any) => (
+                {products.map((product: any, index: number) => (
                   <tr
-                    key={product.Product_ID}
+                    key={`${product.Product_ID}-${index}`}
                     className="border-b border-border hover:bg-primary/5 transition-colors"
                   >
                     <td className="px-6 py-4">
@@ -293,115 +352,207 @@ export default function ProductsPage() {
         )}
       </motion.div>
 
-      {/* Add/Edit Product Dialog */}
+      {/* Add/Edit/Bulk Add Product Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {isEditing ? "Edit Product" : "Add New Product"}
+              {isEditing
+                ? "Edit Product"
+                : isBulkMode
+                  ? "Bulk Add Products"
+                  : "Add New Product"}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="Product_Name">Product Name *</Label>
-              <Input
-                id="Product_Name"
-                name="Product_Name"
-                value={formData.Product_Name}
-                onChange={handleChange}
-                required
-              />
-            </div>
 
-            <div>
-              <Label htmlFor="Category">Category *</Label>
-              <select
-                id="Category"
-                name="Category"
-                value={formData.Category}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              >
-                <option value="">Select a category</option>
-                {PRODUCT_CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <Label htmlFor="Price">Price (GHS) *</Label>
-              <Input
-                id="Price"
-                name="Price"
-                type="number"
-                min="0"
-                step="0.01"
-                value={formData.Price}
-                onChange={handleChange}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="Description">Description</Label>
-              <Textarea
-                id="Description"
-                name="Description"
-                value={formData.Description}
-                onChange={handleChange}
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="Sizes">Sizes (comma-separated)</Label>
-              <Input
-                id="Sizes"
-                name="Sizes"
-                value={formData.Sizes}
-                onChange={handleChange}
-                placeholder="6,7,8,9,10,11,12,13"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="Image_URL">Image URL</Label>
-              <Input
-                id="Image_URL"
-                name="Image_URL"
-                type="url"
-                value={formData.Image_URL}
-                onChange={handleChange}
-                placeholder="https://example.com/image.jpg"
-                pattern="https?://.+"
-                title="Please enter a valid URL starting with http:// or https://"
-              />
-              <p className="text-xs text-foreground/60 mt-1">
-                Enter a valid web URL for the product image
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
+          {isBulkMode ? (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {bulkProducts.map((prod, index) => (
+                <div
+                  key={index}
+                  className="p-4 border border-border rounded-lg space-y-4 relative"
+                >
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-primary">
+                      Product {index + 1}
+                    </h3>
+                    {bulkProducts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeBulkRow(index)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <div>
+                    <Label>Product Name *</Label>
+                    <Input
+                      name="Product_Name"
+                      value={prod.Product_Name}
+                      onChange={(e) => handleBulkChange(index, e)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Category *</Label>
+                    <select
+                      name="Category"
+                      value={prod.Category}
+                      onChange={(e) => handleBulkChange(index, e)}
+                      className="w-full px-4 py-2 border border-border rounded-lg"
+                      required
+                    >
+                      <option value="">Select a category</option>
+                      {PRODUCT_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>Price (GHS) *</Label>
+                    <Input
+                      name="Price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={prod.Price}
+                      onChange={(e) => handleBulkChange(index, e)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Description</Label>
+                    <Textarea
+                      name="Description"
+                      value={prod.Description}
+                      onChange={(e) => handleBulkChange(index, e)}
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <Label>Image URL</Label>
+                    <Input
+                      name="Image_URL"
+                      type="url"
+                      value={prod.Image_URL}
+                      onChange={(e) => handleBulkChange(index, e)}
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
                 type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
+                onClick={addBulkRow}
+                className="w-full py-2 border-2 border-dashed border-border rounded-lg text-foreground/60 hover:text-primary hover:border-primary flex items-center justify-center gap-2"
               >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? "Saving..."
-                  : isEditing
-                    ? "Update Product"
-                    : "Add Product"}
-              </Button>
-            </div>
-          </form>
+                <Plus className="w-4 h-4" /> Add Another Product
+              </button>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Add All Products"}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="Product_Name">Product Name *</Label>
+                <Input
+                  id="Product_Name"
+                  name="Product_Name"
+                  value={formData.Product_Name}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="Category">Category *</Label>
+                <select
+                  id="Category"
+                  name="Category"
+                  value={formData.Category}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  required
+                >
+                  <option value="">Select a category</option>
+                  {PRODUCT_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Label htmlFor="Price">Price (GHS) *</Label>
+                <Input
+                  id="Price"
+                  name="Price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.Price}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="Description">Description</Label>
+                <Textarea
+                  id="Description"
+                  name="Description"
+                  value={formData.Description}
+                  onChange={handleChange}
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="Image_URL">Image URL</Label>
+                <Input
+                  id="Image_URL"
+                  name="Image_URL"
+                  type="url"
+                  value={formData.Image_URL}
+                  onChange={handleChange}
+                  placeholder="https://example.com/image.jpg"
+                  pattern="https?://.+"
+                  title="Please enter a valid URL starting with http:// or https://"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting
+                    ? "Saving..."
+                    : isEditing
+                      ? "Update Product"
+                      : "Add Product"}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

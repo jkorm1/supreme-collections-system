@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, Plus, Save, TrendingUp } from "lucide-react";
+import { DollarSign, Plus, Save, TrendingUp, RefreshCw } from "lucide-react";
 
 export default function SalesPage() {
   const [formData, setFormData] = useState({
@@ -15,7 +15,9 @@ export default function SalesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
 
-  // Employee list
+  const [sales, setSales] = useState<any[]>([]);
+  const [isLoadingSales, setIsLoadingSales] = useState(true);
+
   const employees = [
     "Kofi Adu Owusu",
     "Joseph Korm",
@@ -24,7 +26,6 @@ export default function SalesPage() {
     "Efua Ofori",
   ];
 
-  // Product list (shoes)
   const products = [
     "Nike Air Max",
     "Adidas Ultraboost",
@@ -33,13 +34,35 @@ export default function SalesPage() {
     "Converse Chuck Taylor",
   ];
 
+  const fetchSales = async () => {
+    setIsLoadingSales(true);
+    try {
+      const response = await fetch("/api/sales");
+      const data = await response.json();
+      if (data.success) {
+        setSales(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch sales:", error);
+    } finally {
+      setIsLoadingSales(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSales();
+  }, []);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value, // Changed to always use the value directly
+      [name]:
+        name === "Quantity" || name === "Price"
+          ? parseFloat(value) || 0
+          : value,
     }));
   };
 
@@ -59,7 +82,6 @@ export default function SalesPage() {
 
       if (response.ok) {
         setMessage({ type: "success", text: "Sales recorded successfully!" });
-        // Reset form
         setFormData({
           Employee: "",
           Product: "",
@@ -67,6 +89,7 @@ export default function SalesPage() {
           Price: 0,
           Event: "",
         });
+        fetchSales();
       } else {
         setMessage({
           type: "error",
@@ -83,7 +106,6 @@ export default function SalesPage() {
     }
   };
 
-  // Calculate amounts based on fixed percentages
   const totalSales = formData.Quantity * formData.Price;
   const amounts = {
     "Cost of production": totalSales * 0.5,
@@ -249,63 +271,73 @@ export default function SalesPage() {
           </form>
         </div>
 
-        {/* Sales Summary */}
-        <div className="space-y-6">
-          <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-4">
+        {/* Sales Table */}
+        <div className="bg-card border border-border rounded-lg p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-semibold text-primary">
-                Sales Breakdown
+                Sales Records
               </h2>
             </div>
-
-            <div className="mb-4 p-4 bg-primary/5 rounded-lg">
-              <p className="text-sm text-foreground/70 mb-2">
-                Fixed Percentages:
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-foreground text-sm">
-                <div>Cost of production: 50%</div>
-                <div>Savings: 33.3%</div>
-                <div>Tithe: 10%</div>
-                <div>Sales payroll: 20%</div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">Total Sales</span>
-                <span className="text-lg font-semibold text-primary">
-                  GHS {totalSales.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">
-                  Cost of Production (50%)
-                </span>
-                <span className="text-lg font-semibold text-primary">
-                  GHS {amounts["Cost of production"].toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">Savings (33.3%)</span>
-                <span className="text-lg font-semibold text-primary">
-                  GHS {amounts.Savings.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">Tithe (10%)</span>
-                <span className="text-lg font-semibold text-primary">
-                  GHS {amounts.Tithe.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center p-3 bg-background rounded-lg">
-                <span className="text-foreground/70">Sales Payroll (20%)</span>
-                <span className="text-lg font-semibold text-primary">
-                  GHS {amounts["Sales payroll"].toFixed(2)}
-                </span>
-              </div>
-            </div>
+            <button
+              onClick={fetchSales}
+              className="p-2 hover:bg-primary/10 rounded-lg transition-colors"
+              aria-label="Refresh sales"
+            >
+              <RefreshCw className="w-4 h-4 text-primary" />
+            </button>
           </div>
+
+          {isLoadingSales ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : sales.length === 0 ? (
+            <p className="text-center text-foreground/60 py-8">
+              No sales recorded yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border text-foreground/70">
+                  <tr>
+                    <th className="pb-3 pr-4 font-medium">ID</th>
+                    <th className="pb-3 pr-4 font-medium">Employee</th>
+                    <th className="pb-3 pr-4 font-medium">Product</th>
+                    <th className="pb-3 pr-4 font-medium">Total Sales</th>
+                    <th className="pb-3 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sales.map((sale) => (
+                    <tr
+                      key={sale.ID}
+                      className="border-b border-border/50 last:border-0"
+                    >
+                      <td className="py-3 pr-4 font-mono text-xs text-foreground/80">
+                        {sale.ID}
+                      </td>
+                      <td className="py-3 pr-4 text-foreground/70">
+                        {sale.Employee}
+                      </td>
+                      <td className="py-3 pr-4 text-foreground/70">
+                        {sale.Product}
+                      </td>
+                      <td className="py-3 pr-4 font-semibold text-primary">
+                        GHS {Number(sale["Total Sales"]).toFixed(2)}
+                      </td>
+                      <td className="py-3 text-xs text-foreground/70">
+                        {sale.Date
+                          ? new Date(sale.Date).toLocaleDateString()
+                          : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </motion.div>
     </div>

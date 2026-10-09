@@ -33,7 +33,6 @@ export async function PUT(request: Request, { params }: RouteContext) {
       Category: body.Category,
       Price: price,
       Description: body.Description || '',
-      Sizes: body.Sizes || '6,7,8,9,10,11,12,13',
       Image_URL: body.Image_URL || '',
     }
 

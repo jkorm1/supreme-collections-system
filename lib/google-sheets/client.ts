@@ -77,19 +77,29 @@ async function syncHeaders(
     current = []; // empty header row
   }
 
-  const missing = needed.filter((key) => key && !current.includes(key));
-  if (missing.length === 0) return current;
-
-  const next = [...current, ...missing];
-
-  if (next.length > sheet.columnCount) {
-    await sheet.resize({ rowCount: sheet.rowCount, columnCount: next.length });
+  // If the sheet has data rows but no proper header row recognized,
+  // DO NOT overwrite to avoid deleting existing data. Just return the expected headers.
+  if (current.length === 0 && sheet.rowCount > 1) {
+    return needed;
   }
 
-  await sheet.setHeaderRow(next);
+  // Check if headers exactly match the needed schema (including order and names)
+  const isExactMatch = current.length === needed.length && current.every((val, index) => val === needed[index]);
+  
+  if (isExactMatch) {
+    return current;
+  }
+
+  // If headers differ (e.g., a column was added or renamed), update the header row
+  if (needed.length > sheet.columnCount) {
+    await sheet.resize({ rowCount: sheet.rowCount, columnCount: needed.length });
+  }
+
+  await sheet.setHeaderRow(needed);
   await sheet.loadHeaderRow();
   return sheet.headerValues;
 }
+
 
 // ---------------------------------------------------------------------------
 // Read
@@ -106,8 +116,11 @@ export async function readSheet(sheetName: string): Promise<SheetRow[]> {
       return [];
     }
 
-    const rows = await sheet.getRows();
+    // Explicitly load headers to avoid stale cache issues
+    await sheet.loadHeaderRow();
     const headers = sheet.headerValues;
+    
+    const rows = await sheet.getRows();
 
     return rows.map((row) => rowToObject(headers, row));
   } catch (error) {
@@ -127,7 +140,7 @@ export async function addRowToSheet(sheetName: string, rowData: any) {
     const sheet = getSheetOrThrow(doc, sheetName);
 
     await syncHeaders(sheet, Object.keys(rowData));
-    await sheet.addRow(rowData);
+    await sheet.addRow(rowData, { insert: true });
 
     return rowData;
   } catch (error) {
@@ -150,7 +163,15 @@ export async function updateRowInSheet(
     const doc = await getGoogleSheet();
     const sheet = getSheetOrThrow(doc, sheetName);
 
-    const headers = await syncHeaders(sheet, Object.keys(rowData));
+    // Load existing headers without overwriting them
+    let headers: string[] = [];
+    try {
+      await sheet.loadHeaderRow();
+      headers = sheet.headerValues;
+    } catch {
+      headers = []; // empty header row
+    }
+
     const rows = await sheet.getRows();
 
     if (rowIndex < 0 || rowIndex >= rows.length) {
@@ -170,6 +191,7 @@ export async function updateRowInSheet(
   }
 }
 
+
 // Update the row whose `idColumn` equals `id`. Returns null if not found.
 export async function updateRowById(
   sheetName: string,
@@ -181,7 +203,15 @@ export async function updateRowById(
     const doc = await getGoogleSheet();
     const sheet = getSheetOrThrow(doc, sheetName);
 
-    const headers = await syncHeaders(sheet, Object.keys(rowData));
+    // Load existing headers without overwriting them
+    let headers: string[] = [];
+    try {
+      await sheet.loadHeaderRow();
+      headers = sheet.headerValues;
+    } catch {
+      headers = []; // empty header row
+    }
+
     const rows = await sheet.getRows();
 
     const row: any = rows.find(
@@ -202,6 +232,7 @@ export async function updateRowById(
     throw error;
   }
 }
+
 
 // ---------------------------------------------------------------------------
 // Delete

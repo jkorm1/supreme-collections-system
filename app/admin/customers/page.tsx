@@ -240,12 +240,16 @@ export default function CustomersPage() {
                       key={customer.Customer_ID}
                       className="border-b border-border/50 last:border-0"
                     >
-                      <td className="py-3 pr-4 font-mono text-xs">
+                      <td className="py-3 pr-4 font-mono text-xs text-primary">
                         {customer.Customer_ID}
                       </td>
-                      <td className="py-3 pr-4">{customer.Full_Name}</td>
-                      <td className="py-3 pr-4">{customer.Phone}</td>
-                      <td className="py-3">{customer.Location}</td>
+                      <td className="py-3 pr-4 text-primary">
+                        {customer.Full_Name}
+                      </td>
+                      <td className="py-3 pr-4 text-primary">
+                        {customer.Phone}
+                      </td>
+                      <td className="py-3 text-primary">{customer.Location}</td>
                     </tr>
                   ))}
                 </tbody>
