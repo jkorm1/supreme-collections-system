@@ -26,7 +26,7 @@ const ROWS: Row[] = [
   },
   {
     label: "Instagram",
-    value: "@supreme_collections",
+    value: "@_supreme_collections",
     href: "https://instagram.com/_supreme_collections",
     external: true,
   },
