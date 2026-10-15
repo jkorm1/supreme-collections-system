@@ -11,17 +11,17 @@ type Review = { name: string; rating: number; text: string };
 
 const REVIEWS: Review[] = [
   {
-    name: "John Mensah",
+    name: "Taufiq Yussif",
     rating: 5,
     text: "Best shoes I've ever owned. Extremely comfortable and stylish!",
   },
   {
-    name: "Ama Osei",
+    name: "Christian Frimpong",
     rating: 5,
     text: "Fast delivery and excellent customer service. Highly recommended!",
   },
   {
-    name: "Kwame Asante",
+    name: "Joseph Korm",
     rating: 5,
     text: "Premium quality at affordable prices. Will definitely buy again.",
   },
