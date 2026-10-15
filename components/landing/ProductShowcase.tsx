@@ -25,6 +25,13 @@ function isSoldOut(product: Product): boolean {
   return Number(raw) <= 0;
 }
 
+// True on phones/tablets where there is no real hover (touch only)
+function isTouchDevice(): boolean {
+  return (
+    typeof window !== "undefined" && window.matchMedia("(hover: none)").matches
+  );
+}
+
 export function ProductShowcase() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,6 +44,8 @@ export function ProductShowcase() {
   const [missingSizeFor, setMissingSizeFor] = useState<string | null>(null);
   // Card that just had an item added (drives the "Added" button state)
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  // Card whose size panel is open on touch screens (the tap version of hover)
+  const [openId, setOpenId] = useState<string | null>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { addItem } = useCart();
@@ -63,6 +72,35 @@ export function ProductShowcase() {
     };
   }, []);
 
+  // Close the open panel when the user taps outside that card or presses Escape
+  useEffect(() => {
+    if (!openId) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const tile = (e.target as HTMLElement).closest<HTMLElement>(
+        "[data-tile]",
+      );
+      if (tile?.dataset.tile !== openId) setOpenId(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [openId]);
+
+  // Tapping the product image opens/closes its size panel on touch screens.
+  // On desktop, hover/focus handles it, so clicks do nothing here.
+  const handleTileTap = (productId: string) => {
+    if (!isTouchDevice()) return;
+    setOpenId((prev) => (prev === productId ? null : productId));
+  };
+
   const handleSelectSize = (
     productId: string,
     e: React.ChangeEvent<HTMLInputElement>,
@@ -83,7 +121,11 @@ export function ProductShowcase() {
 
     setJustAddedId(product.Product_ID);
     if (addedTimer.current) clearTimeout(addedTimer.current);
-    addedTimer.current = setTimeout(() => setJustAddedId(null), 1500);
+    addedTimer.current = setTimeout(() => {
+      setJustAddedId(null);
+      // On touch screens, tuck the panel away once the confirmation has shown
+      if (isTouchDevice()) setOpenId(null);
+    }, 1500);
   };
 
   return (
@@ -140,6 +182,7 @@ export function ProductShowcase() {
             const added = justAddedId === id;
             const soldOut = isSoldOut(product);
             const sizeHint = parseSizes(product.Sizes);
+            const open = openId === id;
 
             return (
               <motion.article
@@ -154,8 +197,12 @@ export function ProductShowcase() {
                 }}
                 className="group"
               >
-                {/* Image tile */}
-                <div className="relative aspect-[4/5] overflow-hidden bg-[#f5f5f5]">
+                {/* Image tile: tap to reveal the size panel on touch screens */}
+                <div
+                  data-tile={id}
+                  onClick={() => handleTileTap(id)}
+                  className="relative aspect-[4/5] overflow-hidden bg-[#f5f5f5]"
+                >
                   {product.Image_URL ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -177,10 +224,18 @@ export function ProductShowcase() {
                     </span>
                   )}
 
-                  {/* Quick add: slides up on hover/focus (desktop),
-                      always visible on touch screens */}
+                  {/* Quick add: hidden by default everywhere.
+                      Desktop: slides up on hover/focus.
+                      Touch: slides up when the tile is tapped. */}
                   {!soldOut && (
-                    <div className="absolute inset-x-2 bottom-2 rounded-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-all duration-300 md:translate-y-[120%] md:opacity-0 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100 md:group-hover:translate-y-0 md:group-hover:opacity-100">
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className={`absolute inset-x-2 bottom-2 rounded-xl bg-white/95 p-3 shadow-lg backdrop-blur transition-all duration-300 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100 md:group-hover:translate-y-0 md:group-hover:opacity-100 ${
+                        open
+                          ? "translate-y-0 opacity-100"
+                          : "pointer-events-none translate-y-[120%] opacity-0 md:pointer-events-auto"
+                      }`}
+                    >
                       <label
                         htmlFor={`size-${id}`}
                         className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-foreground/60"
