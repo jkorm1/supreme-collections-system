@@ -1,50 +1,74 @@
-'use client'
+import { Barlow_Condensed } from "next/font/google";
 
-import { motion } from 'framer-motion'
-import { CheckCircle, Heart, Zap, Shield } from 'lucide-react'
+/**
+ * Nike-style "why us" band:
+ * - full-bleed black section for contrast between the white sections around it
+ * - giant uppercase condensed statement, left-aligned
+ * - four plain text columns, each capped with a thin rule (no icons, no cards)
+ * - one white pill CTA
+ */
+
+const headline = Barlow_Condensed({
+  subsets: ["latin"],
+  weight: ["800"],
+  display: "swap",
+});
+
+const REASONS = [
+  {
+    title: "Premium quality",
+    desc: "Only the finest materials and craftsmanship.",
+  },
+  {
+    title: "Affordable luxury",
+    desc: "Premium products at reasonable prices.",
+  },
+  {
+    title: "Fast delivery",
+    desc: "Quick and reliable delivery to your location.",
+  },
+  {
+    title: "Excellent support",
+    desc: "24/7 customer service and lifetime support.",
+  },
+];
 
 export function WhyUs() {
-  const reasons = [
-    { icon: <CheckCircle className="w-8 h-8" />, title: 'Premium Quality', desc: 'Only the finest materials and craftsmanship' },
-    { icon: <Heart className="w-8 h-8" />, title: 'Affordable Luxury', desc: 'Premium products at reasonable prices' },
-    { icon: <Zap className="w-8 h-8" />, title: 'Fast Delivery', desc: 'Quick and reliable delivery to your location' },
-    { icon: <Shield className="w-8 h-8" />, title: 'Excellent Support', desc: '24/7 customer service and lifetime support' },
-  ]
-
   return (
-    <section id="why-us" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4 text-center">
-            Why Choose Supreme Collections
-          </h2>
-          <p className="text-lg text-foreground/60 text-center max-w-2xl mx-auto mb-16">
-            We're committed to delivering excellence in every aspect of our business
-          </p>
-        </motion.div>
+    <section
+      id="why-us"
+      aria-labelledby="why-us-heading"
+      className="bg-black px-4 py-16 font-sans text-white sm:px-12 sm:py-24"
+    >
+      <h2
+        id="why-us-heading"
+        className={`${headline.className} max-w-5xl text-[clamp(3.5rem,11vw,9rem)] font-extrabold uppercase leading-[0.9] tracking-tight`}
+      >
+        Why choose
+        <br />
+        Supreme Collections
+      </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {reasons.map((reason, index) => (
-            <motion.div
-              key={reason.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              viewport={{ once: true }}
-              className="p-6 bg-gradient-to-br from-primary/5 to-accent/5 rounded-xl border border-border hover:border-primary/30 transition-colors"
-            >
-              <div className="text-primary mb-4">{reason.icon}</div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">{reason.title}</h3>
-              <p className="text-foreground/60 text-sm">{reason.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
+      <p className="mt-6 max-w-md text-base text-neutral-300">
+        We&apos;re committed to delivering excellence in every part of what we
+        do.
+      </p>
+
+      <a
+        href="#"
+        className="mt-6 inline-flex h-10 items-center rounded-full bg-white px-6 text-base font-medium text-black transition-colors hover:bg-neutral-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      >
+        Shop now
+      </a>
+
+      <ul className="mt-16 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+        {REASONS.map((r) => (
+          <li key={r.title} className="border-t border-white/40 pt-4">
+            <h3 className="text-base font-medium">{r.title}</h3>
+            <p className="mt-1 max-w-xs text-base text-neutral-400">{r.desc}</p>
+          </li>
+        ))}
+      </ul>
     </section>
-  )
+  );
 }

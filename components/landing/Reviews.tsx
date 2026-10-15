@@ -1,58 +1,81 @@
-'use client'
+import { Star } from "lucide-react";
 
-import { motion } from 'framer-motion'
-import { Star } from 'lucide-react'
+/**
+ * Nike-style reviews:
+ * - plain title row with the average rating on the right
+ * - three columns, each capped with a black rule; no cards, shadows or italics
+ * - solid black stars, review text in regular weight, name in medium
+ */
+
+type Review = { name: string; rating: number; text: string };
+
+const REVIEWS: Review[] = [
+  {
+    name: "John Mensah",
+    rating: 5,
+    text: "Best shoes I've ever owned. Extremely comfortable and stylish!",
+  },
+  {
+    name: "Ama Osei",
+    rating: 5,
+    text: "Fast delivery and excellent customer service. Highly recommended!",
+  },
+  {
+    name: "Kwame Asante",
+    rating: 5,
+    text: "Premium quality at affordable prices. Will definitely buy again.",
+  },
+];
+
+function Stars({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <span className="sr-only">{rating} out of 5 stars</span>
+      {Array.from({ length: 5 }, (_, i) => (
+        <Star
+          key={i}
+          aria-hidden
+          className={`h-4 w-4 ${
+            i < rating ? "fill-black text-black" : "text-neutral-300"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function Reviews() {
-  const reviews = [
-    { name: 'John Mensah', rating: 5, text: 'Best shoes I\'ve ever owned. Extremely comfortable and stylish!' },
-    { name: 'Ama Osei', rating: 5, text: 'Fast delivery and excellent customer service. Highly recommended!' },
-    { name: 'Kwame Asante', rating: 5, text: 'Premium quality at affordable prices. Will definitely buy again.' },
-  ]
+  const average =
+    REVIEWS.reduce((sum, r) => sum + r.rating, 0) / REVIEWS.length;
 
   return (
-    <section id="reviews" className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary/5 to-accent/5">
-      <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-        >
-          <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-4 text-center">
-            What Our Customers Say
-          </h2>
-          <p className="text-lg text-foreground/60 text-center max-w-2xl mx-auto mb-16">
-            Join thousands of satisfied customers who trust Supreme Collections
+    <section
+      id="reviews"
+      aria-labelledby="reviews-heading"
+      className="bg-white px-4 py-12 font-sans text-black sm:px-12"
+    >
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <h2 id="reviews-heading" className="text-2xl font-medium">
+          What customers say
+        </h2>
+        <div className="flex items-center gap-3">
+          <Stars rating={Math.round(average)} />
+          <p className="text-base">
+            {average.toFixed(1)} from {REVIEWS.length} reviews
           </p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {reviews.map((review, index) => (
-            <motion.div
-              key={review.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              viewport={{ once: true }}
-              className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-all"
-            >
-              <div className="flex gap-1 mb-4">
-                {[...Array(review.rating)].map((_, i) => (
-                  <Star key={i} className="w-5 h-5 fill-accent text-accent" />
-                ))}
-              </div>
-
-              <p className="text-foreground/70 mb-6 italic">"{review.text}"</p>
-
-              <div>
-                <p className="font-semibold text-foreground">{review.name}</p>
-                <p className="text-sm text-foreground/60">Verified Customer</p>
-              </div>
-            </motion.div>
-          ))}
         </div>
       </div>
+
+      <ul className="grid grid-cols-1 gap-x-6 gap-y-10 md:grid-cols-3">
+        {REVIEWS.map((r) => (
+          <li key={r.name} className="flex flex-col border-t border-black pt-4">
+            <Stars rating={r.rating} />
+            <p className="mt-4 text-base">{r.text}</p>
+            <p className="mt-6 text-base font-medium">{r.name}</p>
+            <p className="text-base text-neutral-500">Verified customer</p>
+          </li>
+        ))}
+      </ul>
     </section>
-  )
+  );
 }
